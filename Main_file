@@ -1,0 +1,56 @@
+from langchain_ollama import OllamaEmbeddings
+from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.vectorstores import Chroma 
+from dotenv import load_dotenv
+from langchain_huggingface import HuggingFaceEmbeddings
+
+loading_document = DirectoryLoader(
+    path='Machine Learning',
+    glob="*.pdf",
+    loader_cls=PyPDFLoader
+)
+document_load = loading_document.load()
+
+embedding_llm = HuggingFaceEmbeddings(
+    model_name= "sentence-transformers/all-MiniLM-L6-v2"
+)
+
+simple_llm  = ChatGroq(
+     model="llama-3.1-8b-instant"
+)
+
+# embedding_llm = OllamaEmbeddings(
+#     model="llama3"
+# )
+
+splitting_document = RecursiveCharacterTextSplitter(chunk_size = 300, chunk_overlap = 50 )
+
+document_split = splitting_document.split_documents(document_load)
+
+storing_vectore_docs = Chroma.from_documents(
+    documents=document_split,
+    embedding=embedding_llm,
+    collection_name="my_collection"
+    )
+
+retriever_object = storing_vectore_docs.as_retriever(search_kwargs = {"k":4})
+
+retriever_prompt = PromptTemplate(
+    template="""
+        You are a expert assistant.
+        Answer ONLY from the provided transcript context.
+        If the context is insufficient, just say you don't know.
+        {context}
+        Question: {question}
+""",
+input_variables=["context","question"]
+)
+
+string_parser = StrOutputParser()
+
+query = input("Enter the query : ")
+
+retriever_output  = retriever_object.invoke(query)
+
+print(retriever_output)
